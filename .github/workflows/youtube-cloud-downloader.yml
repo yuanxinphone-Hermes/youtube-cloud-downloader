@@ -56,14 +56,15 @@ jobs:
       - name: Download videos
         id: download
         env:
-          PROXY: ${{ inputs.proxy }}
+          YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
         run: |
           python cloud_downloader.py \
             --urls "${{ inputs.urls }}" \
             --quality "${{ inputs.quality }}" \
             --proxy "${{ inputs.proxy }}" \
             --template "${{ inputs.template }}" \
-            --out-dir downloads
+            --out-dir downloads \
+            --cookies "${{ secrets.YOUTUBE_COOKIES }}"
       
       - name: Upload MP4 artifacts
         uses: actions/upload-artifact@v4
@@ -80,6 +81,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Quality:** ${{ inputs.quality }}" >> $GITHUB_STEP_SUMMARY
           echo "**Proxy:** ${{ inputs.proxy || 'None (direct)' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Cookies:** ${{ secrets.YOUTUBE_COOKIES != '' && 'Provided (hidden)' || 'Not provided' }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ -d downloads ]; then

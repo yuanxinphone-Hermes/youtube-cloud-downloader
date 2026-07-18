@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
 Cloud YouTube Downloader for GitHub Actions
-Uses yt-dlp Python API directly (no subprocess/command-line parsing issues)
+Uses yt-dlp Python API directly with cookie support
 """
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -27,7 +28,7 @@ def parse_urls(urls_input: str):
     return urls
 
 
-def build_ydl_opts(quality: str, proxy: str, template: str, out_dir: Path):
+def build_ydl_opts(quality: str, proxy: str, template: str, out_dir: Path, cookies: str = None):
     """Build yt-dlp options dict for Python API"""
     quality_formats = {
         "best": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
@@ -50,11 +51,28 @@ def build_ydl_opts(quality: str, proxy: str, template: str, out_dir: Path):
         'concurrent_fragment_downloads': 4,
         'quiet': False,
         'no_warnings': False,
-        'ignoreerrors': False,  # Fail fast on error
+        'ignoreerrors': False,
+        # Additional options to help with YouTube bot detection
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'web'],
+                'skip': ['dash', 'hls'],
+            }
+        },
     }
     
     if proxy:
         opts['proxy'] = proxy
+    
+    if cookies:
+        # Write cookies to temp file and pass to yt-dlp
+        import tempfile
+        cookies_file = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False)
+        cookies_file.write(cookies)
+        cookies_file.close()
+        opts['cookiefile'] = cookies_file.name
+        # Store temp file path for cleanup
+        opts['_cookies_temp_file'] = cookies_file.name
     
     return opts
 
@@ -85,6 +103,7 @@ def main():
     parser.add_argument('--template', default='%(uploader)s/%(title)s.%(ext)s',
                        help='Output filename template')
     parser.add_argument('--out-dir', default='downloads', help='Output directory')
+    parser.add_argument('--cookies', default='', help='YouTube cookies (Netscape format)')
     
     args = parser.parse_args()
     
@@ -104,9 +123,19 @@ def main():
     print(f"Output dir: {out_dir.absolute()}")
     print("-" * 60)
     
+    # Get cookies from arg or env var
+    cookies = args.cookies or os.environ.get('YOUTUBE_COOKIES', '')
+    if cookies:
+        print("Using YouTube cookies for authentication")
+    else:
+        print("WARNING: No cookies provided - YouTube may block the request")
+    
     # Build options
-    ydl_opts = build_ydl_opts(args.quality, args.proxy, args.template, out_dir)
+    ydl_opts = build_ydl_opts(args.quality, args.proxy, args.template, out_dir, cookies)
     ydl_opts['logger'] = ProgressLogger()
+    
+    # Track temp cookie file for cleanup
+    cookies_temp_file = ydl_opts.pop('_cookies_temp_file', None)
     
     # Download using Python API
     try:
@@ -115,6 +144,13 @@ def main():
     except Exception as e:
         print(f"\nDownload failed: {e}", file=sys.stderr)
         sys.exit(1)
+    finally:
+        # Cleanup temp cookie file
+        if cookies_temp_file and os.path.exists(cookies_temp_file):
+            try:
+                os.unlink(cookies_temp_file)
+            except:
+                pass
     
     # List downloaded files
     mp4_files = list(out_dir.rglob('*.mp4'))
