@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """
 Cloud YouTube Downloader for GitHub Actions
-- Reads URLs from stdin or args
-- Downloads as MP4 using yt-dlp
-- Outputs to ./downloads/ for artifact upload
+Uses yt-dlp Python API directly (no subprocess/command-line parsing issues)
 """
 import argparse
-import os
 import sys
-import subprocess
 from pathlib import Path
+
+try:
+    import yt_dlp
+except ImportError:
+    print("ERROR: yt-dlp not installed. Run: pip install yt-dlp", file=sys.stderr)
+    sys.exit(1)
 
 
 def parse_urls(urls_input: str):
@@ -18,7 +20,6 @@ def parse_urls(urls_input: str):
     for line in urls_input.strip().split('\n'):
         line = line.strip()
         if line and not line.startswith('#'):
-            # Handle comma-separated on same line
             for url in line.split(','):
                 url = url.strip()
                 if url:
@@ -27,7 +28,7 @@ def parse_urls(urls_input: str):
 
 
 def build_ydl_opts(quality: str, proxy: str, template: str, out_dir: Path):
-    """Build yt-dlp options dict"""
+    """Build yt-dlp options dict for Python API"""
     quality_formats = {
         "best": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "1080p": "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]",
@@ -44,17 +45,35 @@ def build_ydl_opts(quality: str, proxy: str, template: str, out_dir: Path):
         'merge_output_format': 'mp4',
         'outtmpl': str(out_dir / template),
         'nocheckcertificate': True,
-        'no_warnings': False,
-        'quiet': False,
         'retries': 3,
         'fragment_retries': 3,
         'concurrent_fragment_downloads': 4,
+        'quiet': False,
+        'no_warnings': False,
+        'ignoreerrors': False,  # Fail fast on error
     }
     
     if proxy:
         opts['proxy'] = proxy
     
     return opts
+
+
+class ProgressLogger:
+    """Logger to capture yt-dlp output"""
+    def debug(self, msg):
+        if msg.strip() and not msg.startswith('[debug]'):
+            print(msg)
+    
+    def info(self, msg):
+        if msg.strip():
+            print(msg)
+    
+    def warning(self, msg):
+        print(f"WARNING: {msg}")
+    
+    def error(self, msg):
+        print(f"ERROR: {msg}")
 
 
 def main():
@@ -82,30 +101,20 @@ def main():
     # Prepare output directory
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Build yt-dlp command
-    opts = build_ydl_opts(args.quality, args.proxy, args.template, out_dir)
-    
-    cmd = ['python', '-m', 'yt_dlp']
-    for key, value in opts.items():
-        if isinstance(value, bool):
-            if value:
-                cmd.append(f'--{key}')
-        else:
-            cmd.extend([f'--{key.replace("_", "-")}', str(value)])
-    cmd.extend(urls)
-    
-    print(f"\nRunning: {' '.join(cmd[:10])}... [+{len(urls)} URLs]")
     print(f"Output dir: {out_dir.absolute()}")
     print("-" * 60)
     
-    # Run download
+    # Build options
+    ydl_opts = build_ydl_opts(args.quality, args.proxy, args.template, out_dir)
+    ydl_opts['logger'] = ProgressLogger()
+    
+    # Download using Python API
     try:
-        result = subprocess.run(cmd, check=False)
-        if result.returncode != 0:
-            print(f"\nyt-dlp exited with code {result.returncode}", file=sys.stderr)
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download(urls)
     except Exception as e:
-        print(f"Error running yt-dlp: {e}", file=sys.stderr)
+        print(f"\nDownload failed: {e}", file=sys.stderr)
+        sys.exit(1)
     
     # List downloaded files
     mp4_files = list(out_dir.rglob('*.mp4'))
