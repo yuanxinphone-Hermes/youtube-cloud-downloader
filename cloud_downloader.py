@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Cloud YouTube Downloader for GitHub Actions
-Uses yt-dlp Python API directly with cookie support
+Uses yt-dlp Python API directly with robust format selection
 """
 import argparse
 import os
@@ -30,15 +30,16 @@ def parse_urls(urls_input: str):
 
 
 def build_ydl_opts(quality: str, proxy: str, template: str, out_dir: Path, cookies: str = None):
-    """Build yt-dlp options dict for Python API"""
-    # More flexible format selectors
+    """Build yt-dlp options dict for Python API - robust format selection"""
+    
+    # Most permissive format selectors that work with Shorts, restricted videos, etc.
     quality_formats = {
-        "best": "bv*+ba/b",          # Best video + best audio / best single
+        "best": "bv*+ba/b",                    # Best video + best audio / best single
         "1080p": "bv*[height<=1080]+ba/b[height<=1080]",
         "720p": "bv*[height<=720]+ba/b[height<=720]",
         "480p": "bv*[height<=480]+ba/b[height<=480]",
         "360p": "bv*[height<=360]+ba/b[height<=360]",
-        "audio": "ba",                # Best audio only
+        "audio": "ba",                          # Best audio only
     }
     
     format_selector = quality_formats.get(quality, quality_formats["best"])
@@ -54,10 +55,10 @@ def build_ydl_opts(quality: str, proxy: str, template: str, out_dir: Path, cooki
         'quiet': False,
         'no_warnings': False,
         'ignoreerrors': False,
-        # Extractor args: prefer web client (supports cookies), include android as fallback
+        # Use web client primarily (supports cookies), android as fallback
         'extractor_args': {
             'youtube': {
-                'player_client': ['web', 'android'],  # Both web and android
+                'player_client': ['web', 'android'],
                 'skip': ['dash', 'hls'],
             }
         },
@@ -151,7 +152,7 @@ def main():
             except:
                 pass
     
-    # List downloaded files
+    # List downloaded files (any video format)
     video_files = []
     for ext in ['*.mp4', '*.mkv', '*.webm', '*.mov', '*.flv', '*.m4v']:
         video_files.extend(out_dir.rglob(ext))
