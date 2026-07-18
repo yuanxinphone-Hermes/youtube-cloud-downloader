@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Cloud YouTube Downloader for GitHub Actions
-Uses yt-dlp Python API directly with robust format selection
+Uses yt-dlp Python API with robust format selection and cookie support
 """
 import argparse
 import os
@@ -32,7 +32,7 @@ def parse_urls(urls_input: str):
 def build_ydl_opts(quality: str, proxy: str, template: str, out_dir: Path, cookies: str = None):
     """Build yt-dlp options dict for Python API - robust format selection"""
     
-    # Most permissive format selectors that work with Shorts, restricted videos, etc.
+    # Most permissive format selectors
     quality_formats = {
         "best": "bv*+ba/b",                    # Best video + best audio / best single
         "1080p": "bv*[height<=1080]+ba/b[height<=1080]",
@@ -55,12 +55,16 @@ def build_ydl_opts(quality: str, proxy: str, template: str, out_dir: Path, cooki
         'quiet': False,
         'no_warnings': False,
         'ignoreerrors': False,
-        # Use web client primarily (supports cookies), android as fallback
+        # Extractor args: use web client (supports cookies), android as fallback
         'extractor_args': {
             'youtube': {
                 'player_client': ['web', 'android'],
                 'skip': ['dash', 'hls'],
             }
+        },
+        # Additional options to help with bot detection
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         },
     }
     
@@ -73,6 +77,9 @@ def build_ydl_opts(quality: str, proxy: str, template: str, out_dir: Path, cooki
         cookies_file.close()
         opts['cookiefile'] = cookies_file.name
         opts['_cookies_temp_file'] = cookies_file.name
+        print(f"Cookie file created: {cookies_file.name}")
+    else:
+        print("WARNING: No cookies provided - YouTube will likely block the request")
     
     return opts
 
