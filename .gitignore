@@ -1,0 +1,134 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+dist/
+build/
+*.spec
+*.exe
+*.log
+
+# Data files
+*.pdf
+*.jpg
+*.png
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+*.ico
+*.mp4
+*.mkv
+*.webm
+*.mov
+*.avi
+*.mp3
+*.wav
+*.flac
+*.m4a
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Large data
+*.txt
+!README.txt
+!requirements.txt
+
+# Firecrawl
+.firecrawl/
+
+# YouTube audio app
+youtube-audio-app/
+youtube-audio-app-android/
+
+# AI ten bagger
+ai_ten_bagger/
+ai-ten-bagger-*.md
+ai-ten-bagger-*.pdf
+
+# Bluestacks cleanup
+bluestacks_*.ps1
+bluestacks_*.bat
+
+# Fusion/FreeCAD
+*.FCMacro
+*.FCStd
+*.step
+
+# Misc
+*.key
+*.b64
+*.dataurl
+launch.*
+nul
+cleanup_*.ps1
+cleanup_*.bat
+remove_*.ps1
+remove_*.bat
+step*.ps1
+run_elevated.vbs
+launch_elevated.ps1
+do_elevation.ps1
+elevated_*.ps1
+elevated_*.bat
+final_cleanup.bat
+box_3d_preview.html
+fusion_open_box*.py
+freecad_pad.py
+test_box.FCMacro
+test_import.FCMacro
+test_import.py
+pad_10x10x10.*
+NVDA_Options_Analysis_*.pdf
+PATH_analysis.pdf
+pdf_b64.txt
+image_dataurl.txt
+upload_image*.jpg
+dataurl.txt
+
+# Keep only these:
+# .github/
+# cloud_downloader.py
+# init_github_repo.sh
+# init_github_repo.bat
+# README.md
+# .gitignore
+# youtube_downloader_gui.py (local GUI version)
+# YouTube_Downloader.spec

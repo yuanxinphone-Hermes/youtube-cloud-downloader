@@ -1,0 +1,106 @@
+name: YouTube Cloud Downloader
+
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: 'YouTube URLs (one per line or comma separated)'
+        required: true
+        type: string
+      quality:
+        description: 'Video quality'
+        required: true
+        default: 'best'
+        type: choice
+        options:
+          - best
+          - 1080p
+          - 720p
+          - 480p
+          - 360p
+          - audio
+      proxy:
+        description: 'Proxy URL (socks5://host:port or http://host:port) - optional'
+        required: false
+        type: string
+      template:
+        description: 'Output filename template (yt-dlp format)'
+        required: true
+        default: '%(uploader)s/%(title)s.%(ext)s'
+        type: string
+
+permissions:
+  contents: write  # needed for artifact upload
+
+jobs:
+  download:
+    name: Download Videos
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install yt-dlp
+        run: |
+          python -m pip install --upgrade pip
+          pip install yt-dlp -q
+          yt-dlp --version
+      
+      - name: Download videos
+        id: download
+        env:
+          PROXY: ${{ inputs.proxy }}
+        run: |
+          python cloud_downloader.py \
+            --urls "${{ inputs.urls }}" \
+            --quality "${{ inputs.quality }}" \
+            --proxy "${{ inputs.proxy }}" \
+            --template "${{ inputs.template }}" \
+            --out-dir downloads
+      
+      - name: Upload MP4 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-downloads
+          path: downloads/
+          retention-days: 7
+          if-no-files-found: warn
+      
+      - name: Create download summary
+        if: always()
+        run: |
+          echo "## Download Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Quality:** ${{ inputs.quality }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Proxy:** ${{ inputs.proxy || 'None (direct)' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -d downloads ]; then
+            find downloads -name "*.mp4" | while read f; do
+              size=$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f")
+              size_mb=$((size / 1024 / 1024))
+              echo "- \`$f\` (${size_mb} MB)" >> $GITHUB_STEP_SUMMARY
+            done
+          else
+            echo "No downloads found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  notify:
+    name: Notify Completion
+    needs: download
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Print completion
+        run: |
+          echo "✅ YouTube download workflow completed"
+          echo "📦 Artifact: youtube-downloads"
+          echo "🔗 Download from: Actions > [Run] > Artifacts"
