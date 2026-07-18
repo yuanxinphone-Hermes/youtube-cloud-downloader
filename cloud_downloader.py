@@ -6,6 +6,7 @@ Uses yt-dlp Python API directly with cookie support
 import argparse
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 try:
@@ -30,13 +31,14 @@ def parse_urls(urls_input: str):
 
 def build_ydl_opts(quality: str, proxy: str, template: str, out_dir: Path, cookies: str = None):
     """Build yt-dlp options dict for Python API"""
+    # More flexible format selectors
     quality_formats = {
-        "best": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-        "1080p": "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]",
-        "720p": "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]",
-        "480p": "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]",
-        "360p": "bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]",
-        "audio": "bestaudio[ext=m4a]/bestaudio",
+        "best": "bv*+ba/b",          # Best video + best audio / best single
+        "1080p": "bv*[height<=1080]+ba/b[height<=1080]",
+        "720p": "bv*[height<=720]+ba/b[height<=720]",
+        "480p": "bv*[height<=480]+ba/b[height<=480]",
+        "360p": "bv*[height<=360]+ba/b[height<=360]",
+        "audio": "ba",                # Best audio only
     }
     
     format_selector = quality_formats.get(quality, quality_formats["best"])
@@ -52,10 +54,10 @@ def build_ydl_opts(quality: str, proxy: str, template: str, out_dir: Path, cooki
         'quiet': False,
         'no_warnings': False,
         'ignoreerrors': False,
-        # Additional options to help with YouTube bot detection
+        # Extractor args: prefer web client (supports cookies), include android as fallback
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'web'],
+                'player_client': ['web', 'android'],  # Both web and android
                 'skip': ['dash', 'hls'],
             }
         },
@@ -65,13 +67,10 @@ def build_ydl_opts(quality: str, proxy: str, template: str, out_dir: Path, cooki
         opts['proxy'] = proxy
     
     if cookies:
-        # Write cookies to temp file and pass to yt-dlp
-        import tempfile
         cookies_file = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False)
         cookies_file.write(cookies)
         cookies_file.close()
         opts['cookiefile'] = cookies_file.name
-        # Store temp file path for cleanup
         opts['_cookies_temp_file'] = cookies_file.name
     
     return opts
@@ -153,16 +152,32 @@ def main():
                 pass
     
     # List downloaded files
-    mp4_files = list(out_dir.rglob('*.mp4'))
+    video_files = []
+    for ext in ['*.mp4', '*.mkv', '*.webm', '*.mov', '*.flv', '*.m4v']:
+        video_files.extend(out_dir.rglob(ext))
+    
     print(f"\n{'='*60}")
-    print(f"Downloaded {len(mp4_files)} MP4 file(s):")
-    for f in mp4_files:
+    print(f"Downloaded {len(video_files)} video file(s):")
+    for f in video_files:
         size_mb = f.stat().st_size / 1024 / 1024
         print(f"  {f.relative_to(out_dir)} ({size_mb:.1f} MB)")
     
-    if not mp4_files:
-        print("  (No MP4 files found - check logs above)")
+    if not video_files:
+        print("  (No video files found - check logs above)")
         sys.exit(1)
+
+
+def parse_urls(urls_input: str):
+    """Parse URLs from multiline string or comma-separated"""
+    urls = []
+    for line in urls_input.strip().split('\n'):
+        line = line.strip()
+        if line and not line.startswith('#'):
+            for url in line.split(','):
+                url = url.strip()
+                if url:
+                    urls.append(url)
+    return urls
 
 
 if __name__ == '__main__':
